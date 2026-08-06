@@ -8,7 +8,7 @@ def main():
     app = QApplication(sys.argv)
 
     window = Viewer("/home/william/Desktop/norge/sorted")
-    window.show()
+    window.showMaximized()
 
     sys.exit(app.exec())
 

@@ -25,6 +25,9 @@ class PreloadTask(QRunnable):
                 return
 
         pixmap = self.cache._load(self.path)
+        
+        if pixmap is None:
+            return
 
         with self.cache.lock:
 

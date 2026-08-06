@@ -31,13 +31,7 @@ class Overlay(QWidget):
         self.next_button = QPushButton("→")
         self.play_button = QPushButton("▶")
         self.seek_slider = SeekSlider(Qt.Horizontal)
-        print(self.seek_slider.geometry())
         self.seek_slider.setMinimumHeight(30)
-        self.seek_slider.setStyleSheet("""
-        QSlider {
-            background: red;
-        }
-        """)
         self.seek_slider.setFocusPolicy(Qt.NoFocus)
         self.time_label = QLabel("00:00 / 00:00")
         self.favourite_button = QPushButton("♡")
@@ -135,5 +129,4 @@ class Overlay(QWidget):
         self.play_button.hide()
     
     def mousePressEvent(self, event):
-        print("overlay")
         super().mousePressEvent(event)

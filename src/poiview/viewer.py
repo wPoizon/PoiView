@@ -5,8 +5,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QStackedWidget,
-    QLabel,
-    QSlider,
 )
 
 from poiview.media import MediaFolder
@@ -211,9 +209,14 @@ class Viewer(QMainWindow):
     
     def toggle_fullscreen(self):
         if self.isFullScreen():
-            self.showNormal()
+            self.setWindowState(
+                (self.windowState() & ~Qt.WindowFullScreen)
+                | Qt.WindowMaximized
+            )
         else:
-            self.showFullScreen()
+            self.setWindowState(
+                self.windowState() | Qt.WindowFullScreen
+            )
 
 
     def mouseDoubleClickEvent(self, event):
@@ -250,13 +253,14 @@ Esc      Exit fullscreen
             self,
             "Keyboard shortcuts",
             """
-← / →    Previous / Next
+← / →    Previous / Next media
+Space    Play / Pause video
 Enter    Favourite
-Delete   Trash
+Delete   Move to trash
 Ctrl+Z   Undo
-F         Fullscreen
-Esc       Exit fullscreen
 H         Toggle overlay
+F         Toggle fullscreen
+Esc       Exit fullscreen
 I         File information
 F1        Help
 """.strip(),
@@ -279,7 +283,10 @@ F1        Help
             return
 
         if event.key() == Qt.Key_Escape and self.isFullScreen():
-            self.showNormal()
+            self.setWindowState(
+                (self.windowState() & ~Qt.WindowFullScreen)
+                | Qt.WindowMaximized
+            )
             return
 
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -439,7 +446,6 @@ F1        Help
         return super().eventFilter(obj, event)
     
     def mousePressEvent(self, event):
-        print("viewer")
         if self.overlay_hidden:
             self.show_overlay()
 
