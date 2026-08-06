@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+if [ ! -f ".venv/bin/python" ]; then
+    echo "Virtual environment missing."
+    echo "Run:"
+    echo "python3 -m venv .venv"
+    echo "./.venv/bin/pip install -r requirements.txt"
+    exit 1
+fi
+
+exec ./.venv/bin/python src/main.py "$@"
