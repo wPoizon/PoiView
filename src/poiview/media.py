@@ -17,8 +17,15 @@ SUPPORTED_EXTENSIONS = {
 
 
 class MediaFolder:
-    def __init__(self, folder):
-        self.folder = Path(folder)
+    def __init__(self, path):
+        path = Path(path)
+
+        if path.is_dir():
+            self.folder = path
+            start_file = None
+        else:
+            self.folder = path.parent
+            start_file = path
 
         self.files = sorted(
             [
@@ -29,7 +36,10 @@ class MediaFolder:
             ]
         )
 
-        self.index = 0
+        if start_file is None:
+            self.index = 0
+        else:
+            self.index = self.files.index(start_file)
 
     def current(self):
         if not self.files:

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+if [ ! -f ".venv/bin/python" ]; then
+    echo "Virtual environment missing."
+    exit 1
+fi
+
+export PYTHONPATH=src
+
+exec ./.venv/bin/python -m poiview.main "/home/william/Desktop/norge/sorted"

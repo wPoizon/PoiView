@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QFileDialog
 import sys
 
 from poiview.viewer import Viewer
@@ -7,7 +7,18 @@ from poiview.viewer import Viewer
 def main():
     app = QApplication(sys.argv)
 
-    window = Viewer("/home/william/Desktop/norge/sorted")
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+    else:
+        path = QFileDialog.getExistingDirectory(
+            None,
+            "Open folder",
+        )
+
+        if not path:
+            sys.exit()
+
+    window = Viewer(path)
     window.showMaximized()
 
     sys.exit(app.exec())
