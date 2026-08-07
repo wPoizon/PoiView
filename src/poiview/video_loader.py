@@ -16,6 +16,12 @@ VIDEO_EXTENSIONS = {
 }
 
 
+class VideoView(QGraphicsView):
+
+    def wheelEvent(self, event):
+        event.accept()
+
+
 class VideoLoader:
 
     def __init__(self):
@@ -23,12 +29,16 @@ class VideoLoader:
 
         self.video_item = QGraphicsVideoItem()
         self.scene.addItem(self.video_item)
+        
+        self.zoom = 1.0
 
-        self.widget = QGraphicsView(self.scene)
-        self.widget.setFocusPolicy(Qt.NoFocus)
-        self.widget.setFrameShape(QGraphicsView.NoFrame)
+        self.widget = VideoView(self.scene)
         self.widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.widget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.widget.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self.widget.setResizeAnchor(QGraphicsView.NoAnchor)
+        self.widget.setFocusPolicy(Qt.NoFocus)
+        self.widget.setFrameShape(QGraphicsView.NoFrame)
 
         self.player = QMediaPlayer()
         self.audio = QAudioOutput()
@@ -96,3 +106,18 @@ class VideoLoader:
                 QSizeF(size),
             )
         )
+        
+    def zoom_at(self, pos, factor):
+
+        old_pos = self.widget.mapToScene(pos)
+
+        self.zoom *= factor
+        self.zoom = max(1.0, min(self.zoom, 5.0))
+
+        self.widget.resetTransform()
+        self.widget.scale(self.zoom, self.zoom)
+
+        new_pos = self.widget.mapToScene(pos)
+
+        delta = new_pos - old_pos
+        self.widget.translate(delta.x(), delta.y())

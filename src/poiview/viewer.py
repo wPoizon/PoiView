@@ -289,6 +289,18 @@ class Viewer(QMainWindow):
             return
 
         if self.video.is_video(current):
+
+            if event.angleDelta().y() > 0:
+                self.video.zoom_at(
+                    event.position().toPoint(),
+                    1.1
+                )
+            else:
+                self.video.zoom_at(
+                    event.position().toPoint(),
+                    1 / 1.1
+                )
+            event.accept()
             return
 
         mouse_pos = event.position().toPoint()
