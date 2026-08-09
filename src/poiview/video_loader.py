@@ -19,7 +19,7 @@ VIDEO_EXTENSIONS = {
 class VideoView(QGraphicsView):
 
     def wheelEvent(self, event):
-        event.accept()
+        event.ignore()
 
 
 class VideoLoader:

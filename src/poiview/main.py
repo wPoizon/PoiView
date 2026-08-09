@@ -11,8 +11,11 @@ def main():
         path = sys.argv[1]
     else:
         dialog = QFileDialog()
-        dialog.setFileMode(QFileDialog.AnyFile)
-        dialog.setOption(QFileDialog.ShowDirsOnly, False)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilter(
+            "Media files (*.jpg *.jpeg *.png *.bmp *.gif *.webp "
+            "*.cr2 *.dng *.mp4 *.mov *.avi *.mkv)"
+        )
 
         if dialog.exec():
             selected = dialog.selectedFiles()[0]

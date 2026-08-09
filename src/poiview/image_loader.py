@@ -2,7 +2,7 @@ from pathlib import Path
 
 import rawpy
 
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage
 from PIL import Image, ImageOps
 
 
@@ -18,7 +18,7 @@ class ImageLoader:
     }
 
     @staticmethod
-    def load(path: str | Path) -> QPixmap:
+    def load(path: str | Path) -> QImage:
         path = Path(path)
 
         if path.suffix.lower() in ImageLoader.RAW_EXTENSIONS:
@@ -27,23 +27,35 @@ class ImageLoader:
         image = Image.open(path)
         image = ImageOps.exif_transpose(image)
 
-        if image.mode != "RGB":
-            image = image.convert("RGB")
+        if image.mode not in ("RGB", "RGBA"):
+            image = image.convert("RGBA")
 
-        data = image.tobytes()
+        if image.mode == "RGBA":
+            data = image.tobytes()
 
-        qimage = QImage(
-            data,
-            image.width,
-            image.height,
-            image.width * 3,
-            QImage.Format_RGB888,
-        ).copy()
+            qimage = QImage(
+                data,
+                image.width,
+                image.height,
+                image.width * 4,
+                QImage.Format_RGBA8888,
+            ).copy()
 
-        return QPixmap.fromImage(qimage)
+        else:
+            data = image.tobytes()
+
+            qimage = QImage(
+                data,
+                image.width,
+                image.height,
+                image.width * 3,
+                QImage.Format_RGB888,
+            ).copy()
+
+        return qimage
 
     @staticmethod
-    def _load_raw(path: Path) -> QPixmap:
+    def _load_raw(path: Path) -> QImage:
 
         with rawpy.imread(str(path)) as raw:
             rgb = raw.postprocess()
@@ -58,4 +70,4 @@ class ImageLoader:
             QImage.Format_RGB888,
         ).copy()
 
-        return QPixmap.fromImage(image)
+        return image

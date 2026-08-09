@@ -1,7 +1,8 @@
  
 from collections import OrderedDict
 from threading import Lock
-from PySide6.QtCore import QRunnable, QThreadPool
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
+from PySide6.QtGui import QPixmap
 
 from poiview.image_loader import ImageLoader
 
@@ -19,33 +20,43 @@ class PreloadTask(QRunnable):
 
     def run(self):
 
-        with self.cache.lock:
+        try:
+            image = self.cache._load(self.path)
 
-            if self.path in self.cache.cache:
-                return
+            with self.cache.lock:
 
-        pixmap = self.cache._load(self.path)
-        
-        if pixmap is None:
-            return
+                if image is not None and self.path not in self.cache.cache:
+                    self.cache.cache[self.path] = image
 
-        with self.cache.lock:
+                    while len(self.cache.cache) > self.cache.max_items:
+                        self.cache.cache.popitem(last=False)
 
-            if self.path in self.cache.cache:
-                return
+        finally:
+            with self.cache.lock:
+                self.cache.pending.discard(self.path)
 
-            self.cache.cache[self.path] = pixmap
+            self.cache.imageLoaded.emit(self.path)
 
-            while len(self.cache.cache) > self.cache.max_items:
-                self.cache.cache.popitem(last=False)
+class ImageCache(QObject):
 
-class ImageCache:
+    imageLoaded = Signal(str)
 
     def __init__(self, max_items=11):
+        super().__init__()
+
         self.max_items = max_items
         self.cache = OrderedDict()
         self.lock = Lock()
-        self.thread_pool = QThreadPool.globalInstance()
+        self.thread_pool = QThreadPool()
+        self.thread_pool.setMaxThreadCount(2)
+        self.pending = set()
+        
+    def cached(self, paths):
+        with self.lock:
+            return sum(
+                str(path) in self.cache
+                for path in paths
+            )
 
     def get(self, path):
         path = str(path)
@@ -53,24 +64,30 @@ class ImageCache:
         with self.lock:
             if path in self.cache:
                 self.cache.move_to_end(path)
-                return self.cache[path]
+                return QPixmap.fromImage(self.cache[path])
 
         # Ladda UTANFÖR låset
-        pixmap = self._load(path)
+        image = self._load(path)
 
         with self.lock:
 
             # Någon annan tråd kan ha hunnit lägga in bilden
             if path in self.cache:
                 self.cache.move_to_end(path)
-                return self.cache[path]
+                return QPixmap.fromImage(self.cache[path])
 
-            self.cache[path] = pixmap
+            self.cache[path] = image
 
             while len(self.cache) > self.max_items:
                 self.cache.popitem(last=False)
 
-            return pixmap
+            return QPixmap.fromImage(image)
+        
+    def contains(self, path):
+        path = str(path)
+
+        with self.lock:
+            return path in self.cache
 
     def preload(self, paths):
 
@@ -79,13 +96,34 @@ class ImageCache:
             path = str(path)
 
             with self.lock:
-                if path in self.cache:
+                if (
+                    path in self.cache
+                    or path in self.pending
+                ):
                     continue
+
+                self.pending.add(path)
 
             self.thread_pool.start(
                 PreloadTask(self, path)
             )
-                
+            
+    def preload_priority(self, path):
+        path = str(path)
+
+        with self.lock:
+            if (
+                path in self.cache
+                or path in self.pending
+            ):
+                return
+
+            self.pending.add(path)
+
+        self.thread_pool.start(
+            PreloadTask(self, path)
+        )
+
     def _load(self, path):
 
         if Path(path).suffix.lower() in VIDEO_EXTENSIONS:
@@ -95,3 +133,8 @@ class ImageCache:
 
     def clear(self):
         self.cache.clear()
+
+
+    def shutdown(self):
+        self.thread_pool.clear()
+        self.thread_pool.waitForDone()

@@ -7,8 +7,16 @@ SUPPORTED_EXTENSIONS = {
     ".bmp",
     ".gif",
     ".webp",
+
+    # RAW
     ".cr2",
+    ".cr3",
+    ".nef",
+    ".arw",
     ".dng",
+    ".rw2",
+
+    # Video
     ".mp4",
     ".mov",
     ".avi",

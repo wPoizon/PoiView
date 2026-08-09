@@ -31,15 +31,13 @@ class Viewer(QMainWindow):
         
         self.media = MediaFolder(file)
         self.cache = ImageCache(max_items=cache_amount * 2 + 1)
+        self.cache.imageLoaded.connect(self.image_loaded)
         self.video = VideoLoader()
         
         folder = self.media.folder
 
         self.favourites_folder = folder / "favourites"
-        self.favourites_folder.mkdir(exist_ok=True)
-
         self.trash_folder = folder / "trash"
-        self.trash_folder.mkdir(exist_ok=True)
 
         self.label = QLabel()
         self.label.setAlignment(Qt.AlignCenter)
@@ -71,12 +69,37 @@ class Viewer(QMainWindow):
         self.raw_label.hide()
         self.raw_label.raise_()
         
+        self.favourite_label = QLabel("♥", self)
+        self.favourite_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                color: white;
+                font-size: 20px;
+            }
+        """)
+        self.favourite_label.hide()
+        self.favourite_label.raise_()
+        
         self.overlay = Overlay(self)
         self.toast = Toast(self)
+
+        self.folder_toast = Toast(self)
+        self.folder_toast.set_small()
+
         self.info_dialog = InfoDialog(self)
         self.last_action = None
         
         self.setMouseTracking(True)
+
+        self.cache_timer = QTimer(self)
+        self.cache_timer.timeout.connect(self.update_cache_status)
+        self.cache_timer.start(100)
+        
+        self.position_timer = QTimer(self)
+        self.position_timer.setSingleShot(True)
+        self.position_timer.timeout.connect(
+            self.hide_position_info
+        )
 
         self.cursor_timer = QTimer(self)
         self.cursor_timer.setSingleShot(True)
@@ -135,7 +158,21 @@ class Viewer(QMainWindow):
         self.overlay_hidden = False
         
         QApplication.instance().installEventFilter(self)
-        
+    
+    
+    def image_loaded(self, path):
+
+        current = self.media.current()
+
+        if current is None:
+            return
+
+        if str(current) != path:
+            return
+
+        self.original_pixmap = self.cache.get(path)
+        self.update_image()
+
         
     def update_image(self):
 
@@ -177,8 +214,23 @@ class Viewer(QMainWindow):
 
     def update_view(self):
         current = self.media.current()
-        
+
+        if current is None:
+            self.label.clear()
+            self.video.stop()
+            self.overlay.set_favourite(False)
+            self.favourite_label.hide()
+            self.raw_label.hide()
+            self.update_cache_status()
+            return
+                
+        self.update_cache_status()
+                
         self.overlay.set_favourite(
+            (self.favourites_folder / current.name).exists()
+        )
+        
+        self.favourite_label.setVisible(
             (self.favourites_folder / current.name).exists()
         )
         
@@ -210,12 +262,18 @@ class Viewer(QMainWindow):
 
             self.stack.setCurrentWidget(self.label)
 
-            self.original_pixmap = self.cache.get(current)
-
-            self.update_image()
+            if self.cache.contains(current):
+                self.original_pixmap = self.cache.get(current)
+                self.update_image()
+            else:
+                self.original_pixmap = None
+                self.label.clear()
+                self.label.setText("Loading...")
+                self.cache.preload_priority(current)
 
         self.overlay.raise_()
         self.raw_label.raise_()
+        self.favourite_label.raise_()
         
         if self.info_dialog.isVisible():
             self.info_dialog.set_file(current)
@@ -228,6 +286,42 @@ class Viewer(QMainWindow):
         seconds %= 60
 
         return f"{minutes:02}:{seconds:02}"
+        
+    def hide_position_info(self):
+        self.overlay.position_label.hide()
+        self.overlay.cache_label.hide()
+        
+    def show_position_info(self):
+        self.overlay.position_label.show()
+        self.overlay.cache_label.show()
+
+        self.position_timer.start(2000)
+        
+    def update_cache_status(self):
+        current_index = self.media.index
+
+        before_files = self.media.files[
+            max(0, current_index - self.cache_amount):
+            current_index
+        ]
+
+        after_files = self.media.files[
+            current_index + 1:
+            min(
+                self.media.count(),
+                current_index + self.cache_amount + 1,
+            )
+        ]
+
+        before = self.cache.cached(before_files)
+        after = self.cache.cached(after_files)
+
+        self.overlay.set_position_info(
+            current_index + 1,
+            self.media.count(),
+            before,
+            after,
+        )
     
     def update_video_time(self):
 
@@ -247,10 +341,13 @@ class Viewer(QMainWindow):
         self.overlay.show()
         self.overlay.raise_()
 
+        self.show_position_info()
+
 
     def hide_overlay(self):
         self.overlay_hidden = True
         self.overlay.hide()
+        self.hide_position_info()
         
     def hide_cursor(self):
         self.setCursor(Qt.BlankCursor)
@@ -343,7 +440,7 @@ class Viewer(QMainWindow):
 
             self.last_mouse_pos = current
 
-            self.update_view()
+            self.update_image()
 
         super().mouseMoveEvent(event)
 
@@ -418,7 +515,7 @@ F1        Help
                 (self.windowState() & ~Qt.WindowFullScreen)
                 | Qt.WindowMaximized
             )
-            QTimer.singleShot(200, self.resize)
+            QTimer.singleShot(200, self.update_view)
             return
 
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
@@ -445,9 +542,11 @@ F1        Help
             return
         
         if event.key() == Qt.Key_Right:
+            self.show_position_info()
             self.next()
 
         elif event.key() == Qt.Key_Left:
+            self.show_position_info()
             self.previous()
         
         
@@ -463,6 +562,12 @@ F1        Help
         self.raw_label.adjustSize()
         self.raw_label.move(
             self.width() - self.raw_label.width() - margin,
+            margin
+        )
+        
+        self.favourite_label.adjustSize()
+        self.favourite_label.move(
+            margin,
             margin
         )
 
@@ -484,14 +589,42 @@ F1        Help
         self.update_image()
 
 
-    def previous(self):
-        self.media.previous()
+    def navigate(self, direction):
+        new_index = self.media.index + direction
+
+        if not 0 <= new_index < self.media.count():
+            return
+
+        target = self.media.files[new_index]
+
+        if not self.video.is_video(target):
+            self.cache.preload_priority(target)
+
+        self.toast.hide()
+        self.media.jump(new_index)
         self.update_view()
+        
+    def previous(self):
+        self.navigate(-1)
 
 
     def next(self):
-        self.media.next()
-        self.update_view()
+        self.navigate(1)
+            
+    def show_folder_toast(self, text):
+        self.folder_toast.show_message(text, 2000)
+
+        x = (
+            self.width() - self.folder_toast.width()
+        ) // 2
+
+        y = (
+            self.toast.y()
+            + self.toast.height()
+            + 8
+        )
+
+        self.folder_toast.move(x, y)
     
     def favourite(self):
         current = self.media.current()
@@ -504,11 +637,22 @@ F1        Help
         if destination.exists():
             destination.unlink()
             self.overlay.set_favourite(False)
+            self.favourite_label.hide()
             self.toast.show_message("🤍 Removed from favourites")
+
         else:
+            folder_created = not self.favourites_folder.exists()
+
+            self.favourites_folder.mkdir(exist_ok=True)
+
             shutil.copy2(current, destination)
             self.overlay.set_favourite(True)
+            self.favourite_label.show()
+            self.favourite_label.raise_()
             self.toast.show_message("❤️ Added to favourites")
+            
+            if folder_created:
+                self.show_folder_toast("Favourite folder created")
             
     def trash(self):
         current = self.media.current()
@@ -517,6 +661,17 @@ F1        Help
             return
 
         destination = self.trash_folder / current.name
+
+        counter = 1
+        while destination.exists():
+            destination = (
+                self.trash_folder
+                / f"{current.stem}_{counter}{current.suffix}"
+            )
+            counter += 1
+
+        folder_created = not self.trash_folder.exists()
+        self.trash_folder.mkdir(exist_ok=True)
         
         self.last_action = {
             "type": "trash",
@@ -532,7 +687,15 @@ F1        Help
         if not self.media.files:
             self.label.clear()
             self.video.stop()
+            self.overlay.set_favourite(False)
+            self.favourite_label.hide()
+            self.raw_label.hide()
+            self.update_cache_status()
             self.toast.show_message("🗑 Moved to trash")
+
+            if folder_created:
+                self.show_folder_toast("Trash folder created")
+
             return
 
         if self.media.index >= len(self.media.files):
@@ -541,6 +704,9 @@ F1        Help
         self.update_view()
 
         self.toast.show_message("🗑 Moved to trash")
+        
+        if folder_created:
+            self.show_folder_toast("Trash folder created")
         
     def undo(self):
 
@@ -565,7 +731,7 @@ F1        Help
 
             self.update_view()
 
-            self.toast.show_message("↩ Undo")
+            self.toast.show_message("↩ Restored from trash")
 
         self.last_action = None
     
@@ -605,3 +771,8 @@ F1        Help
             self.show_overlay()
 
         super().mousePressEvent(event)
+    
+    def closeEvent(self, event):
+        self.cache_timer.stop()
+        self.cache.shutdown()
+        event.accept()

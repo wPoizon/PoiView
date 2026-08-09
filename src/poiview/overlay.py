@@ -34,6 +34,13 @@ class Overlay(QWidget):
         self.seek_slider.setMinimumHeight(30)
         self.seek_slider.setFocusPolicy(Qt.NoFocus)
         self.time_label = QLabel("00:00 / 00:00")
+        
+        self.position_label = QLabel("0 / 0")
+        self.position_label.setStyleSheet("font-size: 18px; color: white;")
+
+        self.cache_label = QLabel("(-0 / +0)")
+        self.cache_label.setStyleSheet("font-size: 16px; color: white;")
+        
         self.favourite_button = QPushButton("♡")
         self.trash_button = QPushButton("🗑")
         self.fullscreen_button = QPushButton("⛶")
@@ -78,13 +85,14 @@ class Overlay(QWidget):
         self.play_button.clicked.connect(self.playPauseClicked)
 
         layout = QVBoxLayout(self)
-        
-        controls = QVBoxLayout()
 
+        layout.addWidget(self.position_label)
+        layout.addWidget(self.cache_label)
+        layout.addStretch()
+
+        controls = QVBoxLayout()
         controls.addWidget(self.time_label)
         controls.addWidget(self.seek_slider)
-
-        layout.addStretch()
 
         bottom = QHBoxLayout()
 
@@ -104,6 +112,15 @@ class Overlay(QWidget):
         layout.addLayout(bottom)
         
         self.hide_video_controls()
+        
+    def set_position_info(self, current, total, before, after):
+        self.position_label.setText(
+            f"{current} / {total}"
+        )
+
+        self.cache_label.setText(
+            f"(-{before} / +{after})"
+        )
     
     def set_favourite(self, favourite: bool):
         if favourite:
