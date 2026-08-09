@@ -22,20 +22,24 @@ class PreloadTask(QRunnable):
 
         try:
             image = self.cache._load(self.path)
+        except Exception:
+            image = None
 
-            with self.cache.lock:
+        with self.cache.lock:
 
-                if image is not None and self.path not in self.cache.cache:
-                    self.cache.cache[self.path] = image
+            self.cache.pending.discard(self.path)
 
-                    while len(self.cache.cache) > self.cache.max_items:
-                        self.cache.cache.popitem(last=False)
+            if image is None:
+                return
 
-        finally:
-            with self.cache.lock:
-                self.cache.pending.discard(self.path)
+            if self.path in self.cache.cache:
+                return
 
-            self.cache.imageLoaded.emit(self.path)
+            self.cache.cache[self.path] = image
+
+            while len(self.cache.cache) > self.cache.max_items:
+                self.cache.cache.popitem(last=False)
+        self.cache.imageLoaded.emit(self.path)
 
 class ImageCache(QObject):
 
@@ -67,7 +71,10 @@ class ImageCache(QObject):
                 return QPixmap.fromImage(self.cache[path])
 
         # Ladda UTANFÖR låset
-        image = self._load(path)
+        try:
+            image = self._load(path)
+        except Exception:
+            return None
 
         with self.lock:
 
@@ -105,10 +112,12 @@ class ImageCache(QObject):
                 self.pending.add(path)
 
             self.thread_pool.start(
-                PreloadTask(self, path)
+                PreloadTask(self, path),
+                0,
             )
             
     def preload_priority(self, path):
+
         path = str(path)
 
         with self.lock:
@@ -121,7 +130,8 @@ class ImageCache(QObject):
             self.pending.add(path)
 
         self.thread_pool.start(
-            PreloadTask(self, path)
+            PreloadTask(self, path),
+            1,
         )
 
     def _load(self, path):
@@ -137,4 +147,3 @@ class ImageCache(QObject):
 
     def shutdown(self):
         self.thread_pool.clear()
-        self.thread_pool.waitForDone()

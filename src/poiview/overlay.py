@@ -144,6 +144,37 @@ class Overlay(QWidget):
         self.time_label.hide()
         self.seek_slider.hide()
         self.play_button.hide()
+        
+    def show_navigation_controls(self):
+        self.previous_button.show()
+        self.next_button.show()
+        self.favourite_button.show()
+        self.trash_button.show()
+        self.fullscreen_button.show()
+        self.hide_button.show()
+        self.info_button.show()
+        self.help_button.show()
+    
+    def show_position_only(self):
+        self.show()
+
+        for widget in (
+            self.previous_button,
+            self.next_button,
+            self.favourite_button,
+            self.trash_button,
+            self.fullscreen_button,
+            self.hide_button,
+            self.info_button,
+            self.help_button,
+            self.play_button,
+            self.time_label,
+            self.seek_slider,
+        ):
+            widget.hide()
+
+        self.position_label.show()
+        self.cache_label.show()
     
     def mousePressEvent(self, event):
         super().mousePressEvent(event)

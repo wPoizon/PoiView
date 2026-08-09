@@ -264,6 +264,11 @@ class Viewer(QMainWindow):
 
             if self.cache.contains(current):
                 self.original_pixmap = self.cache.get(current)
+
+                if self.original_pixmap is None:
+                    self.label.clear()
+                    return
+
                 self.update_image()
             else:
                 self.original_pixmap = None
@@ -290,14 +295,23 @@ class Viewer(QMainWindow):
     def hide_position_info(self):
         self.overlay.position_label.hide()
         self.overlay.cache_label.hide()
+
+        if self.overlay_hidden:
+            self.overlay.hide()
         
     def show_position_info(self):
-        self.overlay.position_label.show()
-        self.overlay.cache_label.show()
+        if self.overlay_hidden:
+            self.overlay.show_position_only()
+        else:
+            self.overlay.position_label.show()
+            self.overlay.cache_label.show()
 
         self.position_timer.start(2000)
         
     def update_cache_status(self):
+        if self.media.count() == 0:
+            self.overlay.set_position_info(0, 0, 0, 0)
+            return
         current_index = self.media.index
 
         before_files = self.media.files[
@@ -339,6 +353,13 @@ class Viewer(QMainWindow):
     def show_overlay(self):
         self.overlay_hidden = False
         self.overlay.show()
+        self.overlay.show_navigation_controls()
+
+        current = self.media.current()
+
+        if current is not None and self.video.is_video(current):
+            self.overlay.show_video_controls()
+
         self.overlay.raise_()
 
         self.show_position_info()
